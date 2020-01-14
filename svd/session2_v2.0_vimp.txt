@@ -1,0 +1,102 @@
+!pip install numpy
+!pip install scikit-surprise
+
+
+from surprise import SVD
+from surprise import Dataset
+from surprise import Reader
+from surprise.model_selection import cross_validate
+import pandas as pd
+from surprise import NormalPredictor
+import os
+from collections import defaultdict
+
+
+file_path = os.path.expanduser('/content/ratings_Musical_Instruments.csv')
+
+# As we're loading a custom dataset, we need to define a reader. In the
+# movielens-100k dataset, each line has the following format:
+# 'user item rating timestamp', separated by '\t' characters.
+df=pd.read_csv('/content/ratings_Musical_Instruments.csv')
+df=df.dropna()
+reader = Reader(rating_scale=(1, 5))
+data = Dataset.load_from_df(df[['user_id', 'item_id', 'rating' ]], reader)
+print(df)
+
+from sklearn.model_selection import train_test_split
+trainset,testset=train_test_split(df,test_size=0.2)
+
+trainset.head
+
+testset.head
+
+svd=SVD(100,8)
+data1 = Dataset.load_from_df(trainset[['user_id', 'item_id', 'rating' ]], reader)
+tset=data1.build_full_trainset()
+svd.fit(tset)
+data2 = Dataset.load_from_df(testset[['user_id', 'item_id', 'rating' ]], reader)
+tset1=data2.build_full_trainset()
+teset=tset.build_testset()
+import surprise.accuracy
+predictions=svd.test(teset)
+surprise.accuracy.rmse(predictions, verbose=True)
+recomm=[]
+
+#for removing repeated items
+checked=[]
+for ind in df.index:
+  if df['item_id'][ind] not in checked:
+    checked.append(df['item_id'][ind])
+print(checked)
+
+#for removing repeated users
+checkedu=[]
+for ind in df.index:
+  if df['user_id'][ind] not in checkedu:
+    checkedu.append(df['user_id'][ind])
+print(checkedu[0:20])
+
+for i in checkedu:
+  for m in checked:
+    k=svd.predict(i, m)
+    if k.est>4.88 : 
+      print(k.iid)
+  print('#########################################################')
+
+k=svd.predict(88391, 'B00CAGEII0A')
+if k.est>4.88 : 
+    print(k)
+
+
+
+#not required as of now
+def get_top_n(predictions, n=10):
+    '''Return the top-N recommendation for each user from a set of predictions.
+
+    Args:
+        predictions(list of Prediction objects): The list of predictions, as
+            returned by the test method of an algorithm.
+        n(int): The number of recommendation to output for each user. Default
+            is 10.
+
+    Returns:
+    A dict where keys are user (raw) ids and values are lists of tuples:
+        [(raw item id, rating estimation), ...] of size n.
+    '''
+
+    # First map the predictions to each user.
+    top_n = defaultdict(list)
+    for uid, iid, true_r, est, _ in predictions:
+        top_n[uid].append((iid, est))
+
+    # Then sort the predictions for each user and retrieve the k highest ones.
+    for uid, user_ratings in top_n.items():
+        user_ratings.sort(key=lambda x: x[1], reverse=True)
+        top_n[uid] = user_ratings[:n]
+
+    return top_n
+
+#above function not required
+
+k=svd.predict(88391, 'B000RY68PA')
+  print(k.est)
